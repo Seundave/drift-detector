@@ -17,8 +17,9 @@ resource "aws_s3_bucket" "app" {
   bucket = "drift-detector-app-aa3f37b0"
 
   tags = {
-    Name        = "drift-detector-app"
-    Environment = "dev"
-    ManagedBy   = "Terraform"
+    Name          = "drift-detector-app"
+    Environment   = "dev"
+    ManagedBy     = "Terraform"
+    TerraformName = "app"
   }
 }

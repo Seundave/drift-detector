@@ -6,13 +6,9 @@ def normalise_state(
 ) -> dict[str, dict[str, Any]]:
     """
     Convert raw Terraform state into a normalized resource dictionary.
-
-    Each managed Terraform resource is keyed by its resource address,
-    for example: aws_s3_bucket.app
     """
 
     normalized_resources: dict[str, dict[str, Any]] = {}
-
     resources = state.get("resources", [])
 
     for resource in resources:
@@ -27,16 +23,23 @@ def normalise_state(
             continue
 
         address = f"{resource_type}.{resource_name}"
-
         provider_name = provider.rsplit("/", 1)[-1].rstrip('"]')
-
         instances = resource.get("instances", [])
 
         for index, instance in enumerate(instances):
-            attributes = instance.get("attributes", {})
+            raw_attributes = instance.get("attributes", {})
+
+            # Filter S3 buckets down to target comparison keys, pass others through
+            if resource_type == "aws_s3_bucket":
+                attributes = {
+                    "bucket": raw_attributes.get("bucket") or raw_attributes.get("id"),
+                    "tags": raw_attributes.get("tags") or {},
+                    "region": raw_attributes.get("region") or "eu-west-1",
+                }
+            else:
+                attributes = raw_attributes
 
             resource_key = address
-
             if len(instances) > 1:
                 resource_key = f"{address}[{index}]"
 
