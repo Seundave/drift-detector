@@ -4,6 +4,7 @@ from aws_scanner import scan_s3_buckets
 from differ import compare_states
 from normaliser import normalise_state
 from state_reader import read_state
+from false_positive_filter import filter_differences
 
 
 BUCKET = "drift-detector-tfstate-aa3f37b0"
@@ -36,11 +37,12 @@ def main() -> None:
         expected_state,
         live_state,
     )
+    filtered_differences = filter_differences(differences)
 
     print("\n--- DRIFT RESULTS ---")
-    print(json.dumps(differences, indent=2))
+    print(json.dumps(filtered_differences, indent=2))
 
-    if differences:
+    if filtered_differences:
         print("\nDRIFT DETECTED")
     else:
         print("\nNO DRIFT DETECTED")

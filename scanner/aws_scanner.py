@@ -1,55 +1,94 @@
-import json
 from typing import Any
 
 import boto3
+from botocore.exceptions import ClientError
+
+
+def get_bucket_tags(
+    s3: Any,
+    bucket_name: str,
+) -> dict[str, str]:
+    """
+    Get tags for an S3 bucket.
+
+    Returns an empty dictionary when the bucket has no tags.
+    """
+
+    try:
+        response = s3.get_bucket_tagging(
+            Bucket=bucket_name
+        )
+
+    except ClientError as error:
+        error_code = error.response.get("Error", {}).get("Code")
+
+        if error_code == "NoSuchTagSet":
+            return {}
+
+        raise
+
+    return {
+        tag["Key"]: tag["Value"]
+        for tag in response.get("TagSet", [])
+    }
+
+
+def get_bucket_region(
+    s3: Any,
+    bucket_name: str,
+) -> str:
+    """
+    Get the AWS region where an S3 bucket is located.
+    """
+
+    response = s3.get_bucket_location(
+        Bucket=bucket_name
+    )
+
+    region = response.get("LocationConstraint")
+
+    if region is None:
+        return "us-east-1"
+
+    # AWS historically returns this value for buckets in us-east-1.
+    if region == "EU":
+        return "eu-west-1"
+
+    return region
 
 
 def scan_s3_buckets() -> dict[str, dict[str, Any]]:
     """
     Scan S3 buckets in the AWS account and return them
     in the normalized resource format.
+
+    Only buckets containing the TerraformName tag are
+    considered Terraform-managed resources.
     """
 
     s3 = boto3.client("s3")
 
     response = s3.list_buckets()
 
-    # Pretty print raw boto3 response for list_buckets
-    print("--- RAW S3 LIST_BUCKETS RESPONSE ---")
-    print(json.dumps(response, indent=2, default=str))
-    print("------------------------------------\n")
-
     resources: dict[str, dict[str, Any]] = {}
 
     for bucket in response.get("Buckets", []):
         bucket_name = bucket["Name"]
 
-        # Handle buckets with no tags gracefully to avoid ClientError crashes
-        try:
-            tags_response = s3.get_bucket_tagging(Bucket=bucket_name)
-            
-            tags = {
-                tag["Key"]: tag["Value"]
-                for tag in tags_response.get("TagSet", [])
-            }
-            print("---  Tags response---")
-            print(json.dumps(tags, indent=2, default=str))
-        except s3.exceptions.ClientError:
-            tags = {}
+        tags = get_bucket_tags(
+            s3,
+            bucket_name,
+        )
 
         resource_name = tags.get("TerraformName")
 
         if not resource_name:
             continue
 
-        location_response = s3.get_bucket_location(
-            Bucket=bucket_name
+        region = get_bucket_region(
+            s3,
+            bucket_name,
         )
-
-        region = location_response.get("LocationConstraint")
-
-        if region is None:
-            region = "us-east-1"
 
         address = f"aws_s3_bucket.{resource_name}"
 
@@ -59,8 +98,8 @@ def scan_s3_buckets() -> dict[str, dict[str, Any]]:
             "provider": "aws",
             "attributes": {
                 "bucket": bucket_name,
-                "tags": tags,
                 "region": region,
+                "tags": tags,
             },
         }
 
@@ -68,8 +107,8 @@ def scan_s3_buckets() -> dict[str, dict[str, Any]]:
 
 
 if __name__ == "__main__":
-    # Call function and print the normalized resources dictionary
-    scanned_resources = scan_s3_buckets()
-    
-    print("--- NORMALIZED LIVE AWS RESOURCES ---")
-    print(json.dumps(scanned_resources, indent=2))
+    import json
+
+    live_state = scan_s3_buckets()
+
+    print(json.dumps(live_state, indent=2))
