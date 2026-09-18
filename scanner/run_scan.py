@@ -1,4 +1,5 @@
 import json
+import os
 
 from aws_scanner import scan_s3_buckets
 from differ import compare_states
@@ -6,9 +7,13 @@ from normaliser import normalise_state
 from state_reader import read_state
 from false_positive_filter import filter_differences
 
+os.environ["TF_STATE_BUCKET"] = "drift-detector-tfstate-aa3f37b0"
 
-BUCKET = "drift-detector-tfstate-aa3f37b0"
-KEY = "drift-detector/terraform.tfstate"
+BUCKET = os.environ["TF_STATE_BUCKET"]
+KEY = os.getenv(
+    "TF_STATE_KEY",
+    "drift-detector/terraform.tfstate",
+)
 
 
 def main() -> None:
