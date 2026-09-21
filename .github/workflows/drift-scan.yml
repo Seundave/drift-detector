@@ -38,7 +38,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::322513862609:role/drift-detector-execution-role
           aws-region: eu-north-1
           audience: sts.amazonaws.com
 
