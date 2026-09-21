@@ -7,7 +7,7 @@ from normaliser import normalise_state
 from state_reader import read_state
 from false_positive_filter import filter_differences
 
-os.environ["TF_STATE_BUCKET"] = "drift-detector-tfstate-aa3f37b0"
+# os.environ["TF_STATE_BUCKET"] = "drift-detector-tfstate-aa3f37b0"
 
 BUCKET = os.environ["TF_STATE_BUCKET"]
 KEY = os.getenv(

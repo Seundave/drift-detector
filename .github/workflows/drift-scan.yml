@@ -47,5 +47,7 @@ jobs:
           aws sts get-caller-identity
 
       - name: Run drift detector
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
         run: |
           python scanner/run_scan.py
