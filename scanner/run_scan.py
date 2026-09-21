@@ -49,6 +49,7 @@ def main() -> None:
 
     if filtered_differences:
         print("\nDRIFT DETECTED")
+        raise SystemExit(1)
     else:
         print("\nNO DRIFT DETECTED")
 
