@@ -23,3 +23,16 @@ resource "aws_s3_bucket" "app" {
     TerraformName = "app"
   }
 }
+
+
+resource "aws_instance" "web" {
+  ami           = "ami-06ce3f5aa5b3e591c"
+  instance_type = "t3.micro"
+
+  tags = {
+    Name          = "drift-detector-web"
+    Environment   = "dev"
+    ManagedBy     = "Terraform"
+    TerraformName = "web"
+  }
+}

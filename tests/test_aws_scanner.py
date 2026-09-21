@@ -148,3 +148,67 @@ def test_get_bucket_tags_reraises_unexpected_errors():
         raise AssertionError(
             "Expected AccessDenied error to be raised"
         )
+
+
+def test_scan_ec2_instances(monkeypatch):
+    class FakeEC2:
+        def describe_instances(self):
+            return {
+                "Reservations": [
+                    {
+                        "Instances": [
+                            {
+                                "InstanceId": "i-123456",
+                                "InstanceType": "t3.micro",
+                                "ImageId": "ami-123456",
+                                "Placement": {
+                                    "AvailabilityZone": "eu-north-1a"
+                                },
+                                "SubnetId": "subnet-123",
+                                "VpcId": "vpc-123",
+                                "SecurityGroups": [
+                                    {
+                                        "GroupId": "sg-123"
+                                    }
+                                ],
+                                "State": {
+                                    "Name": "running"
+                                },
+                                "Tags": [
+                                    {
+                                        "Key": "TerraformName",
+                                        "Value": "web",
+                                    },
+                                    {
+                                        "Key": "Environment",
+                                        "Value": "dev",
+                                    },
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+
+    def fake_client(service_name):
+        assert service_name == "ec2"
+        return FakeEC2()
+
+    monkeypatch.setattr(
+        "boto3.client",
+        fake_client,
+    )
+
+    from scanner.aws_scanner import scan_ec2_instances
+
+    result = scan_ec2_instances()
+
+    assert "aws_instance.web" in result
+
+    instance = result["aws_instance.web"]
+
+    assert instance["type"] == "aws_instance"
+    assert instance["attributes"]["instance_type"] == "t3.micro"
+    assert instance["attributes"]["ami"] == "ami-123456"
+    assert instance["attributes"]["vpc_id"] == "vpc-123"
+    assert instance["attributes"]["state"] == "running"

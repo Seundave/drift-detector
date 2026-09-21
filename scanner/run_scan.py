@@ -1,7 +1,7 @@
 import json
 import os
 
-from aws_scanner import scan_s3_buckets
+from aws_scanner import scan_aws_resources
 from differ import compare_states
 from normaliser import normalise_state
 from state_reader import read_state
@@ -31,7 +31,7 @@ def main() -> None:
 
     print("\nScanning live AWS state...")
 
-    live_state = scan_s3_buckets()
+    live_state = scan_aws_resources()
 
     print("\n--- NORMALIZED LIVE AWS STATE ---")
     print(json.dumps(live_state, indent=2))
