@@ -4,6 +4,9 @@ resource_weights:
   ec2: 7
   s3: 5
 
+attribute_weights:
+  tags: 1
+
 environment_multipliers:
   dev: 1
   staging: 2
