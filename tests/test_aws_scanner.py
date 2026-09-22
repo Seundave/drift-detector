@@ -212,3 +212,98 @@ def test_scan_ec2_instances(monkeypatch):
     assert instance["attributes"]["ami"] == "ami-123456"
     assert instance["attributes"]["vpc_id"] == "vpc-123"
     assert instance["attributes"]["state"] == "running"
+
+
+
+def test_scan_security_groups(monkeypatch):
+    class FakeEC2:
+        def describe_security_groups(self):
+            return {
+                "SecurityGroups": [
+                    {
+                        "GroupId": "sg-123456",
+                        "GroupName": "drift-detector-web",
+                        "Description": "Web security group",
+                        "VpcId": "vpc-123456",
+                        "Tags": [
+                            {
+                                "Key": "TerraformName",
+                                "Value": "web",
+                            },
+                            {
+                                "Key": "Environment",
+                                "Value": "dev",
+                            },
+                        ],
+                        "IpPermissions": [
+                            {
+                                "IpProtocol": "tcp",
+                                "FromPort": 80,
+                                "ToPort": 80,
+                                "IpRanges": [
+                                    {
+                                        "CidrIp": "0.0.0.0/0"
+                                    }
+                                ],
+                                "Ipv6Ranges": [],
+                                "UserIdGroupPairs": [],
+                            }
+                        ],
+                        "IpPermissionsEgress": [
+                            {
+                                "IpProtocol": "-1",
+                                "FromPort": 0,
+                                "ToPort": 0,
+                                "IpRanges": [
+                                    {
+                                        "CidrIp": "0.0.0.0/0"
+                                    }
+                                ],
+                                "Ipv6Ranges": [],
+                                "UserIdGroupPairs": [],
+                            }
+                        ],
+                    }
+                ]
+            }
+
+    def fake_client(service_name):
+        assert service_name == "ec2"
+        return FakeEC2()
+
+    monkeypatch.setattr(
+        "boto3.client",
+        fake_client,
+    )
+
+    from scanner.aws_scanner import scan_security_groups
+
+    result = scan_security_groups()
+
+    assert "aws_security_group.web" in result
+
+    security_group = result[
+        "aws_security_group.web"
+    ]
+
+    assert (
+        security_group["type"]
+        == "aws_security_group"
+    )
+
+    assert (
+        security_group["attributes"]["group_id"]
+        == "sg-123456"
+    )
+
+    assert (
+        security_group["attributes"]["vpc_id"]
+        == "vpc-123456"
+    )
+
+    assert (
+        security_group["attributes"]["ingress"][0][
+            "from_port"
+        ]
+        == 80
+    )

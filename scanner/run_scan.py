@@ -45,7 +45,7 @@ def main() -> None:
     filtered_differences = filter_differences(differences)
 
     print("\n--- DRIFT RESULTS ---")
-    print(json.dumps(filtered_differences, indent=2))
+    print(json.dumps(filtered_differences, indent=2, default=str))
 
     if filtered_differences:
         print("\nDRIFT DETECTED")

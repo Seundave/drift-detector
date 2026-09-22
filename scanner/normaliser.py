@@ -1,4 +1,66 @@
-from typing import Any
+from typing import Any, Dict
+
+
+def _normalise_s3_bucket(raw_attributes: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "bucket": raw_attributes.get("bucket") or raw_attributes.get("id"),
+        "region": raw_attributes.get("region") or "eu-north-1",
+        "tags": raw_attributes.get("tags") or {},
+    }
+
+
+def _normalise_ec2_instance(raw_attributes: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "instance_id": raw_attributes.get("id"),
+        "instance_type": raw_attributes.get("instance_type"),
+        "ami": raw_attributes.get("ami"),
+        "availability_zone": raw_attributes.get("availability_zone"),
+        "subnet_id": raw_attributes.get("subnet_id"),
+        "vpc_id": raw_attributes.get("vpc_id"),
+        "security_groups": raw_attributes.get("vpc_security_group_ids")
+        or raw_attributes.get("security_groups")
+        or [],
+        "state": raw_attributes.get("instance_state", "running"),
+        "tags": raw_attributes.get("tags") or {},
+    }
+
+
+def _normalise_sg_rule(rule: Dict[str, Any]) -> Dict[str, Any]:
+    from_port = rule.get("from_port")
+    to_port = rule.get("to_port")
+
+    # AWS API returns null/None for wildcards (protocol "-1" / "all")
+    if rule.get("protocol") == "-1" and (from_port == 0 or from_port is None):
+        from_port = None
+        to_port = None
+
+    return {
+        "protocol": rule.get("protocol"),
+        "from_port": from_port,
+        "to_port": to_port,
+        "cidr_blocks": rule.get("cidr_blocks") or [],
+        "ipv6_cidr_blocks": rule.get("ipv6_cidr_blocks") or [],
+        "security_group_ids": rule.get("security_groups") or [],
+    }
+
+
+def _normalise_security_group(raw_attributes: Dict[str, Any]) -> Dict[str, Any]:
+    ingress_rules = [
+        _normalise_sg_rule(rule) for rule in raw_attributes.get("ingress", [])
+    ]
+    egress_rules = [
+        _normalise_sg_rule(rule) for rule in raw_attributes.get("egress", [])
+    ]
+
+    return {
+        "group_id": raw_attributes.get("id"),
+        "name": raw_attributes.get("name"),
+        "description": raw_attributes.get("description"),
+        "vpc_id": raw_attributes.get("vpc_id"),
+        "ingress": ingress_rules,
+        "egress": egress_rules,
+        "tags": raw_attributes.get("tags") or {},
+    }
 
 
 def normalise_state(
@@ -29,13 +91,13 @@ def normalise_state(
         for index, instance in enumerate(instances):
             raw_attributes = instance.get("attributes", {})
 
-            # Filter S3 buckets down to target comparison keys, pass others through
+            # Filter resource attributes down to target comparison keys
             if resource_type == "aws_s3_bucket":
-                attributes = {
-                    "bucket": raw_attributes.get("bucket") or raw_attributes.get("id"),
-                    "tags": raw_attributes.get("tags") or {},
-                    "region": raw_attributes.get("region") or "eu-west-1",
-                }
+                attributes = _normalise_s3_bucket(raw_attributes)
+            elif resource_type == "aws_instance":
+                attributes = _normalise_ec2_instance(raw_attributes)
+            elif resource_type == "aws_security_group":
+                attributes = _normalise_security_group(raw_attributes)
             else:
                 attributes = raw_attributes
 
@@ -51,6 +113,7 @@ def normalise_state(
             }
 
     return normalized_resources
+
 
 if __name__ == "__main__":
     import json

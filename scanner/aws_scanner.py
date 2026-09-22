@@ -178,9 +178,149 @@ def scan_ec2_instances() -> dict[str, dict[str, Any]]:
     return resources
 
 
+def scan_security_groups() -> dict[str, dict[str, Any]]:
+    """
+    Scan security groups in the AWS account and return them
+    in the normalized resource format.
+
+    Only security groups containing the TerraformName tag
+    are considered Terraform-managed resources.
+    """
+    ec2 = boto3.client("ec2")
+
+    response = ec2.describe_security_groups()
+
+    resources: dict[str, dict[str, Any]] = {}
+
+    for security_group in response.get(
+        "SecurityGroups",
+        [],
+    ):
+        tags = {
+            tag["Key"]: tag["Value"]
+            for tag in security_group.get("Tags", [])
+        }
+
+        resource_name = tags.get("TerraformName")
+
+        if not resource_name:
+            continue
+
+        address = f"aws_security_group.{resource_name}"
+
+        ingress_rules = []
+
+        for permission in security_group.get(
+            "IpPermissions",
+            [],
+        ):
+            ingress_rules.append(
+                {
+                    "protocol": permission.get("IpProtocol"),
+                    "from_port": permission.get("FromPort"),
+                    "to_port": permission.get("ToPort"),
+                    "cidr_blocks": sorted(
+                        [
+                            item["CidrIp"]
+                            for item in permission.get(
+                                "IpRanges",
+                                [],
+                            )
+                        ]
+                    ),
+                    "ipv6_cidr_blocks": sorted(
+                        [
+                            item["CidrIpv6"]
+                            for item in permission.get(
+                                "Ipv6Ranges",
+                                [],
+                            )
+                        ]
+                    ),
+                    "security_group_ids": sorted(
+                        [
+                            item["GroupId"]
+                            for item in permission.get(
+                                "UserIdGroupPairs",
+                                [],
+                            )
+                            if item.get("GroupId")
+                        ]
+                    ),
+                }
+            )
+
+        egress_rules = []
+
+        for permission in security_group.get(
+            "IpPermissionsEgress",
+            [],
+        ):
+            egress_rules.append(
+                {
+                    "protocol": permission.get("IpProtocol"),
+                    "from_port": permission.get("FromPort"),
+                    "to_port": permission.get("ToPort"),
+                    "cidr_blocks": sorted(
+                        [
+                            item["CidrIp"]
+                            for item in permission.get(
+                                "IpRanges",
+                                [],
+                            )
+                        ]
+                    ),
+                    "ipv6_cidr_blocks": sorted(
+                        [
+                            item["CidrIpv6"]
+                            for item in permission.get(
+                                "Ipv6Ranges",
+                                [],
+                            )
+                        ]
+                    ),
+                    "security_group_ids": sorted(
+                        [
+                            item["GroupId"]
+                            for item in permission.get(
+                                "UserIdGroupPairs",
+                                [],
+                            )
+                            if item.get("GroupId")
+                        ]
+                    ),
+                }
+            )
+
+        resources[address] = {
+            "type": "aws_security_group",
+            "name": resource_name,
+            "provider": "aws",
+            "attributes": {
+                "group_id": security_group.get(
+                    "GroupId"
+                ),
+                "name": security_group.get(
+                    "GroupName"
+                ),
+                "description": security_group.get(
+                    "Description"
+                ),
+                "vpc_id": security_group.get(
+                    "VpcId"
+                ),
+                "ingress": ingress_rules,
+                "egress": egress_rules,
+                "tags": tags,
+            },
+        }
+
+    return resources
+
+
 def scan_aws_resources() -> dict[str, dict[str, Any]]:
     """
-    Scan supported AWS resources and return a single
+    Scan all supported AWS resources and return a single
     normalized live-state dictionary.
     """
     resources: dict[str, dict[str, Any]] = {}
@@ -191,6 +331,10 @@ def scan_aws_resources() -> dict[str, dict[str, Any]]:
 
     resources.update(
         scan_ec2_instances()
+    )
+
+    resources.update(
+        scan_security_groups()
     )
 
     return resources
