@@ -67,6 +67,74 @@ def test_removes_aws_prefix_tags():
     assert result == {}
 
 
+def test_timestamp_difference_is_ignored():
+    differences = {
+        "values_changed": {
+            (
+                "root['aws_instance.web']"
+                "['attributes']['launch_time']"
+            ): {
+                "old_value": "2026-09-20T10:00:00",
+                "new_value": "2026-09-21T10:00:00",
+            }
+        }
+    }
+
+    result = filter_differences(
+        differences
+    )
+
+    assert result == {}
+
+
+def test_computed_attribute_difference_is_ignored():
+    differences = {
+        "values_changed": {
+            (
+                "root['aws_instance.web']"
+                "['attributes']['created_at']"
+            ): {
+                "old_value": "2026-09-20",
+                "new_value": "2026-09-21",
+            }
+        }
+    }
+
+    result = filter_differences(
+        differences
+    )
+
+    assert result == {}
+
+
+def test_real_security_group_drift_is_kept():
+    differences = {
+        "values_changed": {
+            (
+                "root['aws_security_group.web']"
+                "['attributes']['ingress']"
+            ): {
+                "old_value": [
+                    {
+                        "from_port": 80
+                    }
+                ],
+                "new_value": [
+                    {
+                        "from_port": 443
+                    }
+                ],
+            }
+        }
+    }
+
+    result = filter_differences(
+        differences
+    )
+
+    assert result == differences
+
+
 if __name__ == "__main__":
     
     differences= test_keeps_real_tag_drift()
