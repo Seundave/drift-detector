@@ -163,9 +163,9 @@ def scan_ec2_instances() -> dict[str, dict[str, Any]]:
                     "subnet_id": instance.get(
                         "SubnetId"
                     ),
-                    "vpc_id": instance.get(
-                        "VpcId"
-                    ),
+                    # "vpc_id": instance.get(
+                    #     "VpcId"
+                    # ),
                     "security_groups": security_groups,
                     "state": instance.get(
                         "State",

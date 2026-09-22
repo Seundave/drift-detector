@@ -16,7 +16,7 @@ def _normalise_ec2_instance(raw_attributes: Dict[str, Any]) -> Dict[str, Any]:
         "ami": raw_attributes.get("ami"),
         "availability_zone": raw_attributes.get("availability_zone"),
         "subnet_id": raw_attributes.get("subnet_id"),
-        "vpc_id": raw_attributes.get("vpc_id"),
+        # "vpc_id": raw_attributes.get("vpc_id"),
         "security_groups": raw_attributes.get("vpc_security_group_ids")
         or raw_attributes.get("security_groups")
         or [],
