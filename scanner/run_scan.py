@@ -2,15 +2,20 @@ import argparse
 import json
 import os
 
-from aws_scanner import scan_aws_resources
-from differ import compare_states
-from normaliser import normalise_state
-from state_reader import read_state
-from false_positive_filter import filter_differences
-from drift_formatter import (
+from scanner.aws_scanner import scan_aws_resources
+from scanner.differ import compare_states
+from scanner.drift_formatter import (
     format_differences,
     print_drift_report,
 )
+from scanner.false_positive_filter import filter_differences
+from scanner.normaliser import normalise_state
+from scanner.state_reader import read_state
+from scorer.report_generator import (
+    build_slack_payload,
+    generate_report,
+)
+from scorer.scorer import score_drift
 
 os.environ["TF_STATE_BUCKET"] = "drift-detector-tfstate-aa3f37b0"
 
@@ -38,6 +43,80 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
+
+
+def get_resource_attributes(
+    resource: str,
+    expected_state: dict,
+    live_state: dict,
+) -> dict:
+    """
+    Get resource attributes for severity scoring.
+
+    Expected Terraform state is preferred because it
+    represents the intended configuration.
+
+    Live state is used as a fallback for resources
+    that exist only in the live environment.
+    """
+
+    expected_resource = expected_state.get(
+        resource,
+        {},
+    )
+
+    expected_attributes = (
+        expected_resource.get(
+            "attributes",
+            {},
+        )
+    )
+
+    if expected_attributes:
+        return expected_attributes
+
+    live_resource = live_state.get(
+        resource,
+        {},
+    )
+
+    return live_resource.get(
+        "attributes",
+        {},
+    )
+
+
+def score_differences(
+    formatted_differences: list[dict],
+    expected_state: dict,
+    live_state: dict,
+) -> list[dict]:
+    """
+    Add severity scoring information to every
+    formatted drift item.
+    """
+
+    scored_drifts = []
+
+    for drift in formatted_differences:
+        resource = drift["resource"]
+
+        attributes = get_resource_attributes(
+            resource=resource,
+            expected_state=expected_state,
+            live_state=live_state,
+        )
+
+        scored_drift = score_drift(
+            drift=drift,
+            attributes=attributes,
+        )
+
+        scored_drifts.append(
+            scored_drift
+        )
+
+    return scored_drifts
 
 
 def main() -> None:
@@ -101,6 +180,7 @@ def main() -> None:
         json.dumps(
             differences,
             indent=2,
+            default=str,
         )
     )
 
@@ -109,15 +189,63 @@ def main() -> None:
         json.dumps(
             filtered_differences,
             indent=2,
+            default=str,
         )
     )
+
+    print("\n--- FORMATTED DRIFT ---")
 
     print_drift_report(
         formatted_differences
     )
 
+    print("\nScoring detected drift...")
 
-    if filtered_differences:
+    scored_drifts = score_differences(
+        formatted_differences=formatted_differences,
+        expected_state=expected_state,
+        live_state=live_state,
+    )
+
+    print("\n--- SCORED DRIFT ---")
+
+    print(
+        json.dumps(
+            scored_drifts,
+            indent=2,
+            default=str,
+        )
+    )
+
+    report = generate_report(
+        scored_drifts
+    )
+
+    slack_payload = build_slack_payload(
+        scored_drifts
+    )
+
+    print("\n--- DRIFT REPORT ---")
+
+    print(
+        json.dumps(
+            report,
+            indent=2,
+            default=str,
+        )
+    )
+
+    print("\n--- SLACK PAYLOAD PREVIEW ---")
+
+    print(
+        json.dumps(
+            slack_payload,
+            indent=2,
+            default=str,
+        )
+    )
+
+    if scored_drifts:
         print("\nREAL DRIFT DETECTED")
 
         if args.dry_run:
