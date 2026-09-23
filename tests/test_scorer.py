@@ -19,8 +19,6 @@ def test_load_scoring_matrix():
     assert "severity_thresholds" in matrix
 
 
-from scorer.scorer import get_resource_type
-
 
 def test_get_resource_type():
     assert (
