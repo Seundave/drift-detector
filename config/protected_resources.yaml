@@ -1,0 +1,4 @@
+protected_resources:
+  - aws_s3_bucket.terraform_state
+  - aws_security_group.production
+  - aws_instance.database

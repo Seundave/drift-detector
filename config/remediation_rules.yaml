@@ -1,0 +1,32 @@
+remediation:
+  auto_fix:
+    enabled: true
+
+    max_score: 3
+
+    allowed_environments:
+      - dev
+      - staging
+
+    require_not_protected: true
+
+    terraform:
+      command: apply
+      target: true
+      auto_approve: true
+
+  alert_only:
+    min_score: 4
+    max_score: 7
+
+    notifications:
+      slack: true
+
+  critical:
+    min_score: 8
+
+    notifications:
+      slack: true
+      pagerduty: true
+
+    block_deployments: true
