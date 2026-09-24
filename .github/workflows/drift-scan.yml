@@ -52,4 +52,4 @@ jobs:
         env:
           TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
         run: |
-          python scanner/run_scan.py
+          python3 -m scanner.run_scan
