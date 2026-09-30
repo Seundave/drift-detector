@@ -31,7 +31,7 @@ def test_low_score_dev_drift_is_auto_fixed():
 
     assert (
         result["terraform"]["auto_approve"]
-        is True
+        is False
     )
 
 

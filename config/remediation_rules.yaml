@@ -13,7 +13,7 @@ remediation:
     terraform:
       command: apply
       target: true
-      auto_approve: true
+      auto_approve: false
 
   alert_only:
     min_score: 4
