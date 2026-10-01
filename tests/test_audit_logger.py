@@ -120,6 +120,13 @@ def test_write_audit_record():
         run_id="abc123",
     )
 
+    # Compute expected key dynamically based on record's generated timestamp
+    expected_key = build_audit_s3_key(
+        run_id=record["run_id"],
+        timestamp=record["timestamp"],
+        prefix="drift-detector/audit",
+    )
+
     result = write_audit_record(
         record,
         bucket="drift-detector-audit",
@@ -127,53 +134,24 @@ def test_write_audit_record():
         s3_client=s3_client,
     )
 
-    # print("result", result)
-
     assert result == {
         "bucket": "drift-detector-audit",
-        "key": (
-            "drift-detector/audit/"
-            "2026/09/30/"
-            "abc123.jsonl"
-        ),
+        "key": expected_key,
         "run_id": "abc123",
     }
 
     s3_client.put_object.assert_called_once()
+    call_kwargs = s3_client.put_object.call_args.kwargs
 
-    call_kwargs = (
-        s3_client.put_object.call_args.kwargs
-    )
+    assert call_kwargs["Bucket"] == "drift-detector-audit"
+    assert call_kwargs["Key"] == expected_key
+    assert call_kwargs["ContentType"] == "application/x-ndjson"
 
-    # print(call_kwargs ,"call_kwargs ")
-
-    assert (
-        call_kwargs["Bucket"]
-        == "drift-detector-audit"
-    )
-
-    assert (
-        call_kwargs["Key"]
-        == "drift-detector/audit/"
-        "2026/09/30/abc123.jsonl"
-    )
-
-    assert (
-        call_kwargs["ContentType"]
-        == "application/x-ndjson"
-    )
-
-    body = call_kwargs["Body"].decode(
-        "utf-8"
-    )
-
+    body = call_kwargs["Body"].decode("utf-8")
     assert body.endswith("\n")
 
     parsed = json.loads(body)
-
-    assert parsed["resource"] == (
-        "aws_instance.web"
-    )
+    assert parsed["resource"] == "aws_instance.web"
     assert parsed["status"] == "SUCCESS"
 
 
