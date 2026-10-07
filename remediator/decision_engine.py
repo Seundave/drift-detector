@@ -36,7 +36,9 @@ def load_yaml_file(
     ) as file:
         config = yaml.safe_load(file)
 
-        print(f"Loaded configuration from {path}: {config}")
+        print(
+            f"Loaded configuration from {path}: {config}"
+        )
 
     if not isinstance(config, dict):
         raise ValueError(
@@ -105,6 +107,7 @@ def determine_decision(
     """
 
     resource = drift["resource"]
+
     environment = str(
         drift.get(
             "environment",
@@ -300,4 +303,15 @@ def decide(
     )
 
 
+def decide_remediation(
+    drift: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Compatibility wrapper used by the remediation
+    orchestrator.
 
+    The actual decision logic remains inside
+    decide() and determine_decision().
+    """
+
+    return decide(drift)

@@ -2,6 +2,7 @@ from pathlib import Path
 import re
 import subprocess
 from typing import Any
+import tempfile
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,19 +45,34 @@ def validate_resource_address(
 
 def build_plan_command(
     resource: str,
+    plan_file: str | None = None,
 ) -> list[str]:
     """
     Build a Terraform plan command targeting exactly
     one validated resource.
+
+    When plan_file is provided, Terraform saves the
+    generated plan to that file so it can later be
+    inspected using `terraform show -json`.
     """
 
     validate_resource_address(resource)
 
-    return [
+    command = [
         "terraform",
         "plan",
         f"-target={resource}",
     ]
+
+    if plan_file:
+        command.extend(
+            [
+                "-out",
+                plan_file,
+            ]
+        )
+
+    return command
 
 
 def build_apply_command(
@@ -86,6 +102,27 @@ def build_apply_command(
         )
 
     return command
+
+
+def build_show_json_command(
+    plan_file: str,
+) -> list[str]:
+    """
+    Build a Terraform command that converts a saved
+    Terraform plan into JSON.
+    """
+
+    if not plan_file:
+        raise ValueError(
+            "Terraform plan file is required."
+        )
+
+    return [
+        "terraform",
+        "show",
+        "-json",
+        plan_file,
+    ]
 
 
 def run_terraform_command(
@@ -121,19 +158,61 @@ def run_terraform_command(
 def terraform_plan(
     resource: str,
     terraform_directory: Path = TERRAFORM_DIRECTORY,
+    plan_file: str | None = None,
 ) -> dict[str, Any]:
     """
     Run a targeted Terraform plan.
+
+    If plan_file is provided, Terraform saves the plan
+    so it can later be inspected as JSON.
     """
 
     command = build_plan_command(
-        resource
+        resource,
+        plan_file=plan_file,
     )
 
     return run_terraform_command(
         command,
         terraform_directory,
     )
+
+
+def terraform_show_json(
+    plan_file: str,
+    terraform_directory: Path = TERRAFORM_DIRECTORY,
+) -> dict[str, Any]:
+    """
+    Convert a saved Terraform plan into JSON.
+    """
+
+    command = build_show_json_command(
+        plan_file
+    )
+
+    return run_terraform_command(
+        command,
+        terraform_directory,
+    )
+
+
+def create_plan_file(
+    terraform_directory: Path = TERRAFORM_DIRECTORY,
+) -> Path:
+    """
+    Create a unique temporary Terraform plan filename.
+    """
+
+    file = tempfile.NamedTemporaryFile(
+        prefix="drift-detector-",
+        suffix=".tfplan",
+        dir=terraform_directory,
+        delete=False,
+    )
+
+    file.close()
+
+    return Path(file.name)
 
 
 def terraform_apply(

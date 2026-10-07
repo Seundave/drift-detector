@@ -2,6 +2,10 @@ import argparse
 import json
 import os
 
+from remediator.remediation_orchestrator import (
+    process_drifts,
+)
+
 from scanner.aws_scanner import scan_aws_resources
 from scanner.differ import compare_states
 from scanner.drift_formatter import (
@@ -19,13 +23,20 @@ from scorer.scorer import score_drift
 
 os.environ["TF_STATE_BUCKET"] = "drift-detector-tfstate-aa3f37b0"
 
+# ADD THIS LINE:
+os.environ["AUDIT_S3_BUCKET"] = os.getenv(
+    "AUDIT_S3_BUCKET", os.environ["TF_STATE_BUCKET"]
+)
+
 BUCKET = os.environ["TF_STATE_BUCKET"]
 KEY = os.getenv(
     "TF_STATE_KEY",
     "drift-detector/terraform.tfstate",
 )
 
-def parse_args() -> argparse.Namespace:
+def parse_args(
+    args: list[str] | None = None,
+) -> argparse.Namespace:
     """
     Parse command-line arguments.
     """
@@ -42,7 +53,7 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
 def get_resource_attributes(
@@ -119,8 +130,10 @@ def score_differences(
     return scored_drifts
 
 
-def main() -> None:
-    args = parse_args()
+def main(
+    args: list[str] | None = None,
+) -> None:
+    args = parse_args(args)
 
     if args.dry_run:
         print("\nDRY RUN MODE ENABLED")
@@ -248,14 +261,31 @@ def main() -> None:
     if scored_drifts:
         print("\nREAL DRIFT DETECTED")
 
+        remediation_results = process_drifts(
+            scored_drifts,
+            state_bucket=BUCKET,
+            state_key=KEY,
+            execute_apply=not args.dry_run,
+        )
+
+        print("\n--- REMEDIATION RESULTS ---")
+
+        print(
+            json.dumps(
+                remediation_results,
+                indent=2,
+                default=str,
+            )
+        )
+
         if args.dry_run:
             print(
-                "DRY RUN: no remediation was performed."
+                "\nDRY RUN: remediation execution "
+                "was disabled."
             )
         else:
             print(
-                "No remediation is currently "
-                "configured."
+                "\nRemediation workflow completed."
             )
 
         raise SystemExit(1)
